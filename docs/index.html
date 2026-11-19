@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>在席ボード</title>
-  <link rel="stylesheet" href="style.css?v=8">
+  <link rel="stylesheet" href="style.css?v=9">
 </head>
 <body>
   <div class="top">
@@ -19,8 +19,8 @@
   <div class="foot">在席ボード</div>
   <div id="toast" class="toast"><span id="toastMsg"></span><button id="extraBtn" style="display:none">行き先</button><button id="undoBtn">戻す</button></div>
 
-  <script src="config.js?v=8"></script>
-  <script src="app.js?v=8"></script>
+  <script src="config.js?v=9"></script>
+  <script src="app.js?v=9"></script>
   <script>
     var state = { statuses: [], locations: [], members: [] };
     var busy = {};      // id → true 通信中(その間はポーリング結果でその人を上書きしない)
@@ -154,13 +154,15 @@
       v = v.trim().slice(0, 40);
       if (v === (m.memo || '')) return;
       var from = m.memo || '';
-      // 状態の送信が終わるのを待ってから送る(外出がまだ保存されていない可能性があるため)
+      // 状態の送信が終わるのを待ってから送る。サーバー側で「外出」の保存が追いついていない時は少し待って再送(最大3回)
+      var tries = 0;
       function send() {
         if (pending[m.id]) { setTimeout(send, 300); return; }
         memoBusy[m.id] = true;
         Z.apiPost({ action: 'memo', id: m.id, memo: v }).then(function (res) {
           memoBusy[m.id] = false; var cur = member(m.id); if (cur) cur.memo = res.memo; render(); setErr('');
         }).catch(function (e) {
+          if (++tries < 3) { setTimeout(send, 1500); return; }
           memoBusy[m.id] = false; var cur = member(m.id); if (cur) cur.memo = from; render();
           setErr('行き先を保存できませんでした: ' + e.message);
         });
