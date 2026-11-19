@@ -76,34 +76,45 @@
     }
     function nextStatus(s) { return state.statuses[(state.statuses.indexOf(s) + 1) % state.statuses.length]; }
 
-    // タップした瞬間に画面を変え、通信は裏で行う。失敗したら元に戻す。
-    function tap(id) {
-      if (busy[id]) return;
-      var m = member(id); if (!m) return;
-      var before = { status: m.status, updated: m.updated };
-      var after = nextStatus(m.status);
+    // タップした瞬間に画面を変える。連打できる。短い間の連打は最終状態だけを1回サーバーに送る。
+    // 失敗したら連打前の状態に戻す。
+    var pending = {};   // id → { before, target, timer, inflight }
+    var SEND_DELAY_MS = 350;
+
+    function startPending(id, m) {
+      if (!pending[id]) pending[id] = { before: { status: m.status, updated: m.updated }, target: null, timer: null, inflight: false };
       busy[id] = true;
-      m.status = after; m.updated = Date.now(); render();
-      Z.toast(m.name + ': ' + before.status + ' → ' + after, function () { undo(id, before); });
-      Z.apiPost({ action: 'cycle', id: id }).then(function (res) {
-        busy[id] = false; apply(res); setErr('');
+      return pending[id];
+    }
+    function setLocal(id, status) {
+      var m = member(id); if (!m) return null;
+      var p = startPending(id, m);
+      m.status = status; m.updated = Date.now(); render();
+      p.target = status;
+      clearTimeout(p.timer);
+      p.timer = setTimeout(function () { flush(id); }, SEND_DELAY_MS);
+      return p;
+    }
+    function flush(id) {
+      var p = pending[id];
+      if (!p || p.inflight || p.target == null) return;
+      var target = p.target; p.target = null; p.inflight = true;
+      Z.apiPost({ action: 'set', id: id, status: target }).then(function (res) {
+        p.inflight = false;
+        if (p.target != null) { flush(id); return; }   // 送信中にさらに押された
+        busy[id] = false; delete pending[id]; apply(res); setErr('');
       }).catch(function (e) {
-        busy[id] = false; m.status = before.status; m.updated = before.updated; render();
+        p.inflight = false; busy[id] = false;
+        var m = member(id); if (m) { m.status = p.before.status; m.updated = p.before.updated; }
+        delete pending[id]; render();
         setErr('反映できませんでした: ' + e.message);
       });
     }
-
-    function undo(id, before) {
+    function tap(id) {
       var m = member(id); if (!m) return;
-      var cur = { status: m.status, updated: m.updated };
-      busy[id] = true;
-      m.status = before.status; m.updated = Date.now(); render();
-      Z.apiPost({ action: 'undo', id: id }).then(function (res) {
-        busy[id] = false; apply(res); setErr('');
-      }).catch(function (e) {
-        busy[id] = false; m.status = cur.status; m.updated = cur.updated; render();
-        setErr('戻せませんでした: ' + e.message);
-      });
+      var p = setLocal(id, nextStatus(m.status));
+      if (!p) return;
+      Z.toast(m.name + ': ' + p.before.status + ' → ' + m.status, function () { setLocal(id, p.before.status); });
     }
 
     function poll() {

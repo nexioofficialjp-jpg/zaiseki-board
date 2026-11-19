@@ -48,8 +48,10 @@ function doPost(e) {
     let out;
     if (a === 'cycle') out = cycleStatus(q.id, 'board');
     else if (a === 'undo') out = undoStatus(q.id, 'board');
+    else if (a === 'set') out = setStatus(q.id, q.status, 'board');
     else if (a === 'me_cycle') out = cycleStatus(findBy_('token', String(q.t || '')).id, 'me');
     else if (a === 'me_undo') out = undoStatus(findBy_('token', String(q.t || '')).id, 'me');
+    else if (a === 'me_set') out = setStatus(findBy_('token', String(q.t || '')).id, q.status, 'me');
     else {
       checkKey_(q.key);
       if (a === 'list') out = adminList_();
@@ -149,6 +151,17 @@ function cycleStatus(id, source) {
     const r = findBy_('id', String(id));
     const next = STATUSES[(STATUSES.indexOf(r.status) + 1) % STATUSES.length];
     return writeStatus_(sheet_(SHEET_ROSTER, ROSTER_HEADER), r, next, source || 'board');
+  });
+}
+
+/** 状態を直接指定する(画面側で連打した結果の最終状態を1回で送る用)。同じ状態なら書かずに現状を返す */
+function setStatus(id, status, source) {
+  status = String(status || '');
+  if (STATUSES.indexOf(status) < 0) throw new Error('不明な状態: ' + status);
+  return withLock_(() => {
+    const r = findBy_('id', String(id));
+    if (r.status === status) return { id: r.id, name: r.name, status: r.status, prev: r.prev, updated: r.updated, location: r.location };
+    return writeStatus_(sheet_(SHEET_ROSTER, ROSTER_HEADER), r, status, source || 'board');
   });
 }
 

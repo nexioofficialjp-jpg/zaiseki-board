@@ -28,14 +28,7 @@
       var box = document.getElementById('card'); box.innerHTML = '';
       if (!me) { box.textContent = '表示できません'; return; }
       var t = Z.tile(me, { hint: 'タップで「' + next(me.status) + '」に' });
-      t.onclick = function () {
-        if (busy) return; busy = true;
-        // 先に画面を変えて、通信は裏で。失敗したら元に戻す。
-        var before = { status: me.status, updated: me.updated };
-        me.status = next(me.status); me.updated = Date.now(); render();
-        Z.apiPost({ action: 'me_cycle', t: TOKEN }).then(function (m) { me = m; render(); busy = false; setErr(''); })
-          .catch(function (e) { me.status = before.status; me.updated = before.updated; render(); setErr('反映できませんでした: ' + e.message); });
-      };
+      t.onclick = function () { setLocal(next(me.status)); };
       box.appendChild(t);
       document.getElementById('flow').textContent = statuses.join(' → ') + (statuses.length ? ' → ' + statuses[0] : '');
     }
@@ -45,7 +38,34 @@
         .catch(function (e) { me = null; render(); setErr(e); });
     }
 
+    // タップした瞬間に画面を変える。連打できる。短い間の連打は最終状態だけを1回サーバーに送る。
+    var pend = null;   // { before, target, timer, inflight }
+    var lastBefore = null;   // 直近の連打前の状態(「直前に戻す」用)
+    function setLocal(status) {
+      if (!me) return;
+      if (!pend) { pend = { before: { status: me.status, updated: me.updated }, target: null, timer: null, inflight: false }; lastBefore = pend.before.status; }
+      busy = true;
+      me.status = status; me.updated = Date.now(); render();
+      pend.target = status;
+      clearTimeout(pend.timer);
+      pend.timer = setTimeout(flush, 350);
+    }
+    function flush() {
+      if (!pend || pend.inflight || pend.target == null) return;
+      var target = pend.target; pend.target = null; pend.inflight = true;
+      Z.apiPost({ action: 'me_set', t: TOKEN, status: target }).then(function (m) {
+        pend.inflight = false;
+        if (pend.target != null) { flush(); return; }
+        pend = null; busy = false; me = m; render(); setErr('');
+      }).catch(function (e) {
+        var b = pend.before; pend = null; busy = false;
+        me.status = b.status; me.updated = b.updated; render();
+        setErr('反映できませんでした: ' + e.message);
+      });
+    }
     document.getElementById('undo').onclick = function () {
+      if (!me) return;
+      if (lastBefore && lastBefore !== me.status) { setLocal(lastBefore); return; }
       if (busy) return; busy = true;
       Z.apiPost({ action: 'me_undo', t: TOKEN }).then(function (m) { me = m; render(); busy = false; setErr(''); }).catch(setErr);
     };
