@@ -60,9 +60,16 @@
 
   var toastTimer = null;
   // extra: { label, fn } を渡すと「戻す」の隣にもう1つボタンを出す(例: 行き先)
-  function toast(msg, onUndo, extra) {
+  // anchor: 押したコマの要素。画面の下半分にあれば通知を上に、上半分なら下に出して、コマを隠さない
+  function toast(msg, onUndo, extra, anchor) {
     var t = document.getElementById('toast');
     if (!t) return;
+    var top = false;
+    if (anchor && anchor.getBoundingClientRect) {
+      var r = anchor.getBoundingClientRect();
+      top = (r.top + r.height / 2) > window.innerHeight / 2;
+    }
+    t.classList.toggle('top', top);
     document.getElementById('toastMsg').textContent = msg;
     var btn = document.getElementById('undoBtn');
     var ex = document.getElementById('extraBtn');
