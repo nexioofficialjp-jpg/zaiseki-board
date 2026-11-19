@@ -40,21 +40,6 @@ button { font: inherit; cursor: pointer; }
 .tile .place { position: absolute; left: 6px; bottom: 3px; font-size: 11px; line-height: 1; background: rgba(0,0,0,.4); color: #fff;
   padding: 3px 8px; border-radius: 9px; cursor: pointer; white-space: nowrap; }
 .tile .place:hover { background: rgba(0,0,0,.6); }
-.me .tile .place { display: none; }
-.me .tile.multi .name { align-self: auto; margin-top: 0; height: 44px; line-height: 44px; }
-.me .places { display: flex; gap: 8px; margin-top: 10px; }
-.me .places button { flex: 1; background: #555; color: #fff; border: 2px solid transparent; border-radius: 10px; padding: 12px 6px; font-size: 15px; }
-.me .places button.on { background: #fff; color: #222; font-weight: 700; }
-.me .places-label { margin-top: 14px; color: #aaa; font-size: 13px; }
-/* 本人用: 初回の名前選び */
-.me .pick-title { font-size: 20px; font-weight: 700; margin: 6px 0 4px; }
-.me .pick-note { color: #aaa; font-size: 13px; margin-bottom: 10px; }
-.me .pick-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; margin: 6px 0 10px; }
-.me .pick-grid button { background: #fff; color: #222; border: 0; border-radius: 6px; padding: 12px 6px; font-size: 16px; font-weight: 700;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.me .pick-grid button:active { background: #ddd; }
-.me .switch { margin-top: 18px; text-align: center; font-size: 13px; }
-.me .switch a { color: #9cf; }
 .empty { padding: 40px; text-align: center; color: #bbb; }
 .foot { text-align: center; color: #888; font-size: 11px; padding: 6px; }
 
@@ -63,18 +48,6 @@ button { font: inherit; cursor: pointer; }
   display: flex; gap: 14px; align-items: center; font-size: 17px; box-shadow: 0 6px 20px rgba(0,0,0,.5); opacity: 0; pointer-events: none; transition: opacity .15s; z-index: 9; white-space: nowrap; }
 .toast.show { opacity: 1; pointer-events: auto; }
 .toast button { background: #fff; color: #111; border: 0; border-radius: 8px; padding: 8px 16px; font-weight: 700; font-size: 16px; }
-
-/* 本人用: ここだけ大きな正方形のコマ */
-.me { max-width: 440px; margin: 0 auto; padding: 16px; }
-.me .tile { display: block; height: auto; width: 100%; aspect-ratio: 1 / 1; max-height: 70vh; padding: 0; }
-.me .tile .name { position: absolute; left: 6px; right: 6px; top: 6px; height: 44px; line-height: 44px; font-size: 24px; }
-.me .tile .st { position: absolute; top: 70px; left: 14px; font-size: 30px; gap: 14px; }
-.me .tile .st .ic { width: 56px; height: 56px; font-size: 34px; border-radius: 3px; }
-.me .tile .hint { display: block; position: absolute; left: 14px; bottom: 34px; font-size: 15px; opacity: .95; }
-.me .tile .time { position: absolute; font-size: 14px; bottom: 8px; right: 10px; font-weight: 700; }
-.me .undo { display: block; width: 100%; margin-top: 14px; background: #555; color: #fff; border: 0; border-radius: 10px; padding: 14px; font-size: 17px; }
-.me .flow { margin-top: 18px; color: #aaa; font-size: 13px; text-align: center; }
-.me .err { color: #ffb4b4; text-align: center; margin-top: 10px; }
 
 @media (max-width: 700px) {
   .top .time { font-size: 24px; }

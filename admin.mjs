@@ -42,7 +42,7 @@ if (action === 'list') {
     for (const m of list) {
       const d = m.updated ? new Date(m.updated).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '';
       const pl = m.places && m.places.length ? `  [兼任: ${m.places.join('/')}]` : '';
-      console.log(`  ${m.id}  ${m.name}  ${m.status}  ${d}${pl}\n      ${r.site}me.html?t=${m.token}`);
+      console.log(`  ${m.id}  ${m.name}  ${m.status}  ${d}${pl}`);
     }
   }
 } else {
