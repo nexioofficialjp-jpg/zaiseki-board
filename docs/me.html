@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>在席ボード</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="me">
+    <div id="card"></div>
+    <button id="undo" class="undo">直前に戻す</button>
+    <div id="flow" class="flow"></div>
+    <div id="err" class="err"></div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+  <script>
+    var TOKEN = (new URLSearchParams(location.search).get('t') || '').replace(/[^A-Za-z0-9]/g, '');
+    var me = null, busy = false, statuses = [];
+
+    function next(s) { return statuses.length ? statuses[(statuses.indexOf(s) + 1) % statuses.length] : ''; }
+    function setErr(e) { document.getElementById('err').textContent = e && e.message ? e.message : (e || ''); busy = false; }
+
+    function render() {
+      var box = document.getElementById('card'); box.innerHTML = '';
+      if (!me) { box.textContent = '表示できません'; return; }
+      var t = Z.tile(me, { hint: 'タップで「' + next(me.status) + '」に' });
+      t.onclick = function () {
+        if (busy) return; busy = true;
+        Z.apiPost({ action: 'me_cycle', t: TOKEN }).then(function (m) { me = m; render(); busy = false; setErr(''); }).catch(setErr);
+      };
+      box.appendChild(t);
+      document.getElementById('flow').textContent = statuses.join(' → ') + (statuses.length ? ' → ' + statuses[0] : '');
+    }
+
+    function load() {
+      Z.apiGet({ api: 'me', t: TOKEN }).then(function (m) { me = m; render(); setErr(''); })
+        .catch(function (e) { me = null; render(); setErr(e); });
+    }
+
+    document.getElementById('undo').onclick = function () {
+      if (busy) return; busy = true;
+      Z.apiPost({ action: 'me_undo', t: TOKEN }).then(function (m) { me = m; render(); busy = false; setErr(''); }).catch(setErr);
+    };
+
+    Z.apiGet({ api: 'state' }).then(function (s) { statuses = s.statuses; render(); }).catch(function () {});
+    load(); setInterval(load, 5000);
+  </script>
+</body>
+</html>

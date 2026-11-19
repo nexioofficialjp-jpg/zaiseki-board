@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>在席ボード</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="top">
+    <span id="time" class="time">--:--</span>
+    <span id="date" class="date"></span>
+    <span class="spacer"></span>
+    <span id="err" class="err"></span>
+    <span class="cols" id="cols"></span>
+  </div>
+  <div id="root"></div>
+  <div id="empty" class="empty" style="display:none">名簿が空です</div>
+  <div class="foot">在席ボード</div>
+  <div id="toast" class="toast"><span id="toastMsg"></span><button id="undoBtn">戻す</button></div>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+  <script>
+    var state = { statuses: [], locations: [], members: [] };
+    var busy = {};
+
+    // 列数 (この端末に記憶)
+    var COL_CHOICES = [4, 5, 6, 8];
+    var cols = Number(localStorage.getItem('zaiseki_cols')) || 5;
+    function applyCols() {
+      document.documentElement.style.setProperty('--cols', cols);
+      var box = document.getElementById('cols'); box.innerHTML = '';
+      COL_CHOICES.forEach(function (n) {
+        var b = document.createElement('button'); b.textContent = n; b.className = n === cols ? 'on' : '';
+        b.onclick = function () { cols = n; localStorage.setItem('zaiseki_cols', n); applyCols(); };
+        box.appendChild(b);
+      });
+    }
+
+    function setErr(msg) {
+      document.getElementById('err').textContent = msg || '';
+    }
+
+    function render() {
+      var root = document.getElementById('root'); root.innerHTML = '';
+      document.getElementById('empty').style.display = state.members.length ? 'none' : '';
+      var groups = state.locations.slice();
+      var others = state.members.filter(function (m) { return state.locations.indexOf(m.location) < 0; });
+      if (others.length) groups.push('その他');
+      groups.forEach(function (loc) {
+        var list = loc === 'その他' ? others : state.members.filter(function (m) { return m.location === loc; });
+        if (!list.length) return;
+        var present = list.filter(function (m) { return m.status === state.statuses[0]; }).length;
+        var h = document.createElement('div'); h.className = 'loc';
+        h.innerHTML = '<span class="nm"></span><span class="cnt"></span>';
+        h.querySelector('.nm').textContent = loc;
+        h.querySelector('.cnt').textContent = state.statuses[0] + ' ' + present + ' / ' + list.length;
+        var g = document.createElement('div'); g.className = 'grid';
+        list.forEach(function (m) {
+          var t = Z.tile(m);
+          t.onclick = function () { tap(m.id); };
+          g.appendChild(t);
+        });
+        root.appendChild(h); root.appendChild(g);
+      });
+    }
+
+    function apply(res) {
+      state.members.forEach(function (m) {
+        if (m.id === res.id) { m.status = res.status; m.updated = res.updated; }
+      });
+      render();
+    }
+
+    function tap(id) {
+      if (busy[id]) return;
+      busy[id] = true;
+      Z.apiPost({ action: 'cycle', id: id }).then(function (res) {
+        busy[id] = false; apply(res); setErr('');
+        Z.toast(res.name + ': ' + res.prev + ' → ' + res.status, function () {
+          Z.apiPost({ action: 'undo', id: id }).then(apply).catch(function (e) { setErr(e.message); });
+        });
+      }).catch(function (e) { busy[id] = false; setErr(e.message); });
+    }
+
+    function poll() {
+      Z.apiGet({ api: 'state' }).then(function (s) { state = s; render(); setErr(''); })
+        .catch(function (e) { setErr('通信エラー: ' + e.message); });
+    }
+
+    function clock() {
+      var d = new Date();
+      document.getElementById('time').textContent = Z.pad(d.getHours()) + ':' + Z.pad(d.getMinutes());
+      document.getElementById('date').textContent = d.getFullYear() + '/' + Z.pad(d.getMonth() + 1) + '/' + Z.pad(d.getDate());
+    }
+
+    applyCols(); clock(); setInterval(clock, 10000);
+    poll(); setInterval(poll, Z.cfg.pollMs);
+  </script>
+</body>
+</html>
