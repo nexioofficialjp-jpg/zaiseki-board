@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>在席ボード</title>
-  <link rel="stylesheet" href="style.css?v=10">
+  <link rel="stylesheet" href="style.css?v=11">
 </head>
 <body>
   <div class="top">
@@ -19,8 +19,8 @@
   <div class="foot">在席ボード</div>
   <div id="toast" class="toast"><span id="toastMsg"></span><button id="extraBtn" style="display:none">行き先</button><button id="undoBtn">戻す</button></div>
 
-  <script src="config.js?v=10"></script>
-  <script src="app.js?v=10"></script>
+  <script src="config.js?v=11"></script>
+  <script src="app.js?v=11"></script>
   <script>
     var state = { statuses: [], locations: [], members: [] };
     var busy = {};      // id → true 通信中(その間はポーリング結果でその人を上書きしない)
@@ -143,7 +143,7 @@
       var rect = el ? el.getBoundingClientRect() : null;
       var p = setLocal(id, nextStatus(m));
       if (!p) return;
-      var extra = m.status === Z.MEMO_STATUS ? { label: '行き先', fn: function () { editMemo(m); } } : null;
+      var extra = Z.hasMemo(m.status) ? { label: '行き先', fn: function () { editMemo(m); } } : null;
       var anchor = rect ? { getBoundingClientRect: function () { return rect; } } : null;
       Z.toast(m.name + ': ' + p.before.status + ' → ' + m.status, function () { setLocal(id, p.before.status); }, extra, anchor);
     }
@@ -151,7 +151,7 @@
     // 行き先メモ(外出中のみ)。先に画面へ出し、通信は裏で。失敗したら戻す。
     var memoBusy = {};
     function editMemo(m) {
-      if (m.status !== Z.MEMO_STATUS) return;
+      if (!Z.hasMemo(m.status)) return;
       var v = window.prompt(m.name + ' の行き先(空にすると消す)', m.memo || '');
       if (v === null) return;
       v = v.trim().slice(0, 40);

@@ -10,7 +10,7 @@
  * POST JSON {key, action: 'list'|'add'|'rename'|'location'|'delete'|'move'|'reissue', ...}  名簿編集(secret.js の鍵)
  */
 const STATUSES = ['在席', '外出', '退社', '休み', '在宅勤務', '出張'];
-const MEMO_STATUS = '外出';      // 行き先メモを持てる状態
+const MEMO_STATUSES = ['外出', '出張'];      // 行き先メモを持てる状態
 const MEMO_MAX = 40;
 const LOCATIONS = ['渡辺ビルA', '渡辺ビルB', '波多野ビル3F', 'Hope crew', '在宅'];
 const SITE_URL = 'https://nexioofficialjp-jpg.github.io/zaiseki-board/';
@@ -67,6 +67,7 @@ function doPost(e) {
       else if (a === 'location') out = adminSetLocation_(q.id, q.location);
       else if (a === 'delete') out = adminDelete_(q.id);
       else if (a === 'move') out = adminMove_(q.id, q.dir);
+      else if (a === 'order') out = adminSetOrder_(q.id, q.order);
       else if (a === 'reissue') out = { token: adminReissueToken_(q.id) };
       else throw new Error('不明な action: ' + a);
     }
@@ -129,7 +130,7 @@ function writeStatus_(sh, r, newStatus, source) {
   const now = new Date();
   sh.getRange(r.row, COL.status, 1, 3).setValues([[newStatus, now, r.status]]);
   let memo = r.memo;
-  if (newStatus !== MEMO_STATUS && memo) {   // 外出から他の状態に変わったら行き先は消す
+  if (MEMO_STATUSES.indexOf(newStatus) < 0 && memo) {   // 外出・出張以外の状態に変わったら行き先は消す
     sh.getRange(r.row, COL.memo).setValue('');
     memo = '';
   }
@@ -143,7 +144,7 @@ function setMemo(id, memo, source) {
   memo = String(memo || '').replace(/[\r\n]+/g, ' ').trim().slice(0, MEMO_MAX);
   return withLock_(() => {
     const r = findBy_('id', String(id));
-    if (r.status !== MEMO_STATUS) throw new Error('行き先は' + MEMO_STATUS + '中だけ書けます');
+    if (MEMO_STATUSES.indexOf(r.status) < 0) throw new Error('行き先は ' + MEMO_STATUSES.join('・') + ' のときだけ書けます');
     if (r.memo !== memo) {
       sheet_(SHEET_ROSTER, ROSTER_HEADER).getRange(r.row, COL.memo).setValue(memo);
       log_(r, r.memo, memo, (source || 'board') + ':行き先');
@@ -337,6 +338,19 @@ function adminMove_(id, dir) {
     rows.forEach(r => sh.getRange(r.row, COL.order).setValue(r.order));
     invalidate_();
     return true;
+  });
+}
+
+/** 並び順の数値を直接指定する(小さいほど前。0 で先頭、既存は 1 から) */
+function adminSetOrder_(id, order) {
+  const n = Number(order);
+  if (!isFinite(n)) throw new Error('順は数値で');
+  return withLock_(() => {
+    const r = findBy_('id', String(id));
+    sheet_(SHEET_ROSTER, ROSTER_HEADER).getRange(r.row, COL.order).setValue(n);
+    log_(r, String(r.order), String(n), 'admin:並び順');
+    invalidate_();
+    return n;
   });
 }
 

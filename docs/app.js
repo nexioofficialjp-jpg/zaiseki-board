@@ -2,7 +2,8 @@
 (function () {
   var CFG = window.ZAISEKI_CONFIG;
   var ICONS = { '在席': '💺', '外出': '👣', '退社': '🏃', '休み': '🏠', '在宅勤務': '💻', '出張': '✈️' };
-  var MEMO_STATUS = '外出';
+  var MEMO_STATUSES = ['外出', '出張'];
+  function hasMemo(status) { return MEMO_STATUSES.indexOf(status) >= 0; }
 
   function pad(n) { return (n < 10 ? '0' : '') + n; }
   function fmtTime(ms) {
@@ -36,7 +37,7 @@
     if (multi) b.classList.add('multi');
     b.innerHTML = '<span class="name"></span><span class="st"><span class="ic"></span><span class="txt"></span></span>' +
       (opts.hint ? '<span class="hint"></span>' : '') +
-      (m.status === MEMO_STATUS ? '<span class="memo" title="タップで行き先を書く"></span>' : '') +
+      (hasMemo(m.status) ? '<span class="memo" title="タップで行き先を書く"></span>' : '') +
       '<span class="time"></span>' +
       (multi && opts.placeChip !== false ? '<span class="place" title="タップで場所を切り替え"></span>' : '');
     b.querySelector('.name').textContent = m.name;
@@ -98,5 +99,5 @@
     }
   }
 
-  window.Z = { cfg: CFG, pad: pad, fmtTime: fmtTime, apiGet: apiGet, apiPost: apiPost, tile: tile, toast: toast, fitNames: fitNames, ICONS: ICONS, MEMO_STATUS: MEMO_STATUS };
+  window.Z = { cfg: CFG, pad: pad, fmtTime: fmtTime, apiGet: apiGet, apiPost: apiPost, tile: tile, toast: toast, fitNames: fitNames, ICONS: ICONS, hasMemo: hasMemo };
 })();

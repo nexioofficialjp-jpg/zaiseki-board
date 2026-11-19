@@ -6,6 +6,7 @@
 //   node admin.mjs location <ID> <拠点>            今いる場所を変える
 //   node admin.mjs places <ID> <拠点1,拠点2>        兼任拠点を設定(空文字 "" で解除)
 //   node admin.mjs move <ID> up|down
+//   node admin.mjs order <ID> <数値>               並び順を直接指定(小さいほど前。0 で先頭)
 //   node admin.mjs reissue <ID>
 //   node admin.mjs delete <ID>
 import { readFileSync } from 'node:fs';
@@ -23,6 +24,7 @@ else if (action === 'rename') { [body.id, body.name] = args; }
 else if (action === 'location') { [body.id, body.location] = args; }
 else if (action === 'places') { [body.id, body.places] = args; }
 else if (action === 'move') { body.id = args[0]; body.dir = args[1] === 'up' ? -1 : 1; }
+else if (action === 'order') { body.id = args[0]; body.order = Number(args[1]); }
 else if (action === 'reissue' || action === 'delete') { body.id = args[0]; }
 else if (action !== 'list') { console.error('不明な操作: ' + action); process.exit(2); }
 
