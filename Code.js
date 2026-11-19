@@ -11,7 +11,7 @@
  */
 const STATUSES = ['在席', '外出', '退社', '休み'];
 const LOCATIONS = ['渡辺ビルA', '渡辺ビルB', '波多野ビル3F', 'Hope crew'];
-const SITE_URL = 'https://hsugiyama0613-commits.github.io/zaiseki-board/';
+const SITE_URL = 'https://nexioofficialjp-jpg.github.io/zaiseki-board/';
 const SHEET_ROSTER = '名簿';
 const SHEET_LOG = 'ログ';
 const CACHE_KEY = 'state_v2';
