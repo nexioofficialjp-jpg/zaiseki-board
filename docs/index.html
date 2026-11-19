@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>在席ボード</title>
-  <link rel="stylesheet" href="style.css?v=11">
+  <link rel="stylesheet" href="style.css?v=12">
 </head>
 <body>
   <div class="top">
@@ -13,14 +13,15 @@
     <span class="spacer"></span>
     <span id="err" class="err"></span>
     <span class="cols" id="cols"></span>
+    <a class="help" href="manual.html">使い方</a>
   </div>
   <div id="root"></div>
   <div id="empty" class="empty" style="display:none">名簿が空です</div>
   <div class="foot">在席ボード</div>
   <div id="toast" class="toast"><span id="toastMsg"></span><button id="extraBtn" style="display:none">行き先</button><button id="undoBtn">戻す</button></div>
 
-  <script src="config.js?v=11"></script>
-  <script src="app.js?v=11"></script>
+  <script src="config.js?v=12"></script>
+  <script src="app.js?v=12"></script>
   <script>
     var state = { statuses: [], locations: [], members: [] };
     var busy = {};      // id → true 通信中(その間はポーリング結果でその人を上書きしない)

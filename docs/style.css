@@ -17,6 +17,8 @@ button { font: inherit; cursor: pointer; }
 .top .cols button { background: #555; color: #ddd; border: 0; border-radius: 3px; min-width: 30px; height: 24px; margin-left: 3px; font-size: 12px; padding: 0 6px; }
 .top .cols button.on { background: #ddd; color: #222; font-weight: 700; }
 .top .err { color: #ffb4b4; font-size: 13px; }
+.top .help { margin-left: 10px; color: #ddd; background: #555; border-radius: 3px; padding: 4px 8px; font-size: 12px; text-decoration: none; align-self: center; }
+.top .help:hover { background: #777; }
 
 /* 拠点の見出し */
 .loc { display: flex; align-items: baseline; gap: 10px; margin: 4px 4px 0; padding: 1px 8px; background: var(--bar);

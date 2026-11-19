@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>在席ボード 使い方</title>
+  <link rel="stylesheet" href="style.css?v=12">
+  <style>
+    body { padding-bottom: 40px; }
+    .man { max-width: 720px; margin: 0 auto; padding: 10px 16px 30px; font-size: 16px; line-height: 1.7; }
+    .man h1 { font-size: 22px; margin: 8px 0 4px; }
+    .man .lead { color: #ccc; margin: 0 0 14px; }
+    .man h2 { font-size: 17px; margin: 22px 0 6px; padding-left: 10px; border-left: 5px solid #94c03a; }
+    .man ol, .man ul { margin: 4px 0 0; padding-left: 22px; }
+    .man li { margin: 4px 0; }
+    .man .ex { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin: 8px 0 4px; max-width: 460px; }
+    .man .ex .tile { pointer-events: none; }
+    .man .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 6px 0; }
+    .man .legend span::before { content: ""; display: inline-block; width: 12px; height: 12px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; background: var(--dot); }
+    .man .note { background: #2a2a2a; border-radius: 6px; padding: 8px 12px; margin-top: 18px; }
+    .man a { color: #9cf; }
+    .man .back { margin-top: 24px; }
+    @media print { html, body { background: #fff; color: #000; } .man .note { background: #eee; } .man .lead { color: #444; } .man a { color: #000; } }
+  </style>
+</head>
+<body>
+<div class="man">
+  <h1>在席ボード 使い方</h1>
+  <p class="lead">みんなの「いま」を1枚で共有するボードです。やることは <b>自分のコマをタップする</b> だけ。</p>
+
+  <h2>1. 開く</h2>
+  <ul>
+    <li>ボードのURLを開く。スマホは「ホーム画面に追加」しておくとワンタップで開けます。</li>
+    <li>PC・タブレット・スマホ、どれで開いても同じ内容です。</li>
+  </ul>
+
+  <h2>2. 状態を変える</h2>
+  <ul>
+    <li>自分の名前のコマを <b>タップするたびに1つ進みます</b>。</li>
+    <li>順番: <b>在席 → 外出 → 退社 → 休み → 在宅勤務 → 出張 → 在席</b>(一周して戻ります)。</li>
+    <li>押した瞬間に色が変わり、数秒で全員の画面に反映されます。</li>
+  </ul>
+  <div class="legend">
+    <span style="--dot: var(--c-在席)">在席</span><span style="--dot: var(--c-外出)">外出</span><span style="--dot: var(--c-退社)">退社</span>
+    <span style="--dot: var(--c-休み)">休み</span><span style="--dot: var(--c-在宅勤務)">在宅勤務</span><span style="--dot: var(--c-出張)">出張</span>
+  </div>
+  <div class="ex">
+    <button class="tile" style="--c: var(--c-在席)"><span class="name">山田　太郎</span><span class="st"><span class="ic">💺</span><span class="txt">在席</span></span><span class="time">11/19 09:00</span></button>
+    <button class="tile" style="--c: var(--c-外出)"><span class="name">山田　太郎</span><span class="st"><span class="ic">👣</span><span class="txt">外出</span></span><span class="memo">市役所</span><span class="time">11/19 13:20</span></button>
+  </div>
+
+  <h2>3. 押し間違えたら</h2>
+  <ul>
+    <li>押した直後に出る帯の <b>「戻す」</b> を押すと元に戻ります(8秒以内)。</li>
+    <li>過ぎてしまったら、そのままタップを続けて一周させてください。</li>
+  </ul>
+
+  <h2>4. 外出・出張の行き先</h2>
+  <ul>
+    <li>外出・出張にした直後の帯の <b>「行き先」</b>、またはコマの <b>「＋行き先」</b> を押して入力します(例: 市役所、〇〇社)。</li>
+    <li>行き先はコマに表示され、在席などに戻すと自動で消えます。</li>
+  </ul>
+
+  <h2>5. 2つの事務所を行き来する人</h2>
+  <ul>
+    <li>コマの左下に <b>「⇄ 拠点名」</b> のバッジがあります。押すと、いる場所がもう一方の事務所に切り替わり、その区画に移動します。</li>
+    <li>コマ本体のタップは状態の切替、バッジのタップは場所の切替です。</li>
+  </ul>
+
+  <div class="note">
+    <b>注意</b>
+    <ul>
+      <li>このURLは <b>社外秘</b> です。知っている人は誰の状態でも変えられます。外部に送らないでください。</li>
+      <li>自分以外のコマも押せます(代理で変えたいときに使えます)。間違えて押したら「戻す」。</li>
+      <li>表示が古いと感じたら、画面を再読み込み(スマホは引っ張って更新)してください。</li>
+    </ul>
+  </div>
+
+  <p class="back"><a href="./">← ボードに戻る</a></p>
+</div>
+</body>
+</html>
