@@ -5,34 +5,80 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <title>在席ボード</title>
-  <link rel="stylesheet" href="style.css?v=5">
+  <link rel="stylesheet" href="style.css?v=6">
 </head>
 <body>
   <div class="me">
-    <div id="card"></div>
-    <div id="placesLabel" class="places-label" style="display:none">いま居る場所(タップで切替)</div>
-    <div id="places" class="places"></div>
-    <button id="undo" class="undo">直前に戻す</button>
-    <div id="flow" class="flow"></div>
+    <!-- 初回: 名簿から自分を選ぶ(この端末に記憶) -->
+    <div id="pick" style="display:none">
+      <div class="pick-title">自分の名前を選んでください</div>
+      <div class="pick-note">この端末に記憶され、次回からは自分のコマが直接開きます。</div>
+      <div id="pickList"></div>
+    </div>
+    <!-- 自分のコマ -->
+    <div id="mine" style="display:none">
+      <div id="card"></div>
+      <div id="placesLabel" class="places-label" style="display:none">いま居る場所(タップで切替)</div>
+      <div id="places" class="places"></div>
+      <button id="undo" class="undo">直前に戻す</button>
+      <div id="flow" class="flow"></div>
+      <div class="switch"><a href="#" id="switchUser">別の人に切り替える</a></div>
+    </div>
     <div id="err" class="err"></div>
   </div>
 
-  <script src="config.js?v=5"></script>
-  <script src="app.js?v=5"></script>
+  <script src="config.js?v=6"></script>
+  <script src="app.js?v=6"></script>
   <script>
+    // 自分の特定: URLの t=トークン があればそれを優先。無ければこの端末に記憶した ID。どちらも無ければ名簿から選ぶ。
     var TOKEN = (new URLSearchParams(location.search).get('t') || '').replace(/[^A-Za-z0-9]/g, '');
-    var me = null, busy = false, statuses = [];
+    var MY_ID = '';
+    try { MY_ID = TOKEN ? '' : (localStorage.getItem('zaiseki_me_id') || ''); } catch (e) {}
+    var me = null, busy = false, statuses = [], state = null;
 
     function next(s) { return statuses.length ? statuses[(statuses.indexOf(s) + 1) % statuses.length] : ''; }
     function setErr(e) { document.getElementById('err').textContent = e && e.message ? e.message : (e || ''); busy = false; }
+    function show(id) { document.getElementById('pick').style.display = id === 'pick' ? '' : 'none'; document.getElementById('mine').style.display = id === 'mine' ? '' : 'none'; }
 
+    // ---- 名前選び ----
+    function renderPick() {
+      show('pick');
+      var root = document.getElementById('pickList'); root.innerHTML = '';
+      state.locations.forEach(function (loc) {
+        var list = state.members.filter(function (m) { return m.location === loc || (m.places && m.places.indexOf(loc) >= 0); });
+        if (!list.length) return;
+        var h = document.createElement('div'); h.className = 'loc'; h.textContent = loc; root.appendChild(h);
+        var g = document.createElement('div'); g.className = 'pick-grid';
+        list.forEach(function (m) {
+          var b = document.createElement('button'); b.textContent = m.name;
+          b.onclick = function () { choose(m.id); };
+          g.appendChild(b);
+        });
+        root.appendChild(g);
+      });
+    }
+    function choose(id) {
+      MY_ID = id;
+      try { localStorage.setItem('zaiseki_me_id', id); } catch (e) {}
+      me = state.members.filter(function (m) { return m.id === id; })[0] || null;
+      render();
+    }
+    document.getElementById('switchUser').onclick = function (ev) {
+      ev.preventDefault();
+      MY_ID = ''; me = null;
+      try { localStorage.removeItem('zaiseki_me_id'); } catch (e) {}
+      if (TOKEN) { location.href = 'me.html'; return; }
+      renderPick();
+    };
+
+    // ---- 自分のコマ ----
     function render() {
+      if (!me) { renderPick(); return; }
+      show('mine');
       var box = document.getElementById('card'); box.innerHTML = '';
-      if (!me) { box.textContent = '表示できません'; return; }
       var t = Z.tile(me, { hint: 'タップで「' + next(me.status) + '」に', placeChip: false });
       t.onclick = function () { setLocal(next(me.status)); };
       box.appendChild(t);
-      // 兼任者: いま居る場所の切替ボタン
       var pb = document.getElementById('places'); pb.innerHTML = '';
       var multi = me.places && me.places.length > 1;
       document.getElementById('placesLabel').style.display = multi ? '' : 'none';
@@ -46,14 +92,15 @@
       document.getElementById('flow').textContent = statuses.join(' → ') + (statuses.length ? ' → ' + statuses[0] : '');
     }
 
-    function load() {
-      Z.apiGet({ api: 'me', t: TOKEN }).then(function (m) { if (busy || placeBusy) return; me = m; render(); setErr(''); })
-        .catch(function (e) { me = null; render(); setErr(e); });
+    // 送信は、トークン経由なら me_*、端末記憶の ID なら通常の set/place を使う
+    function post(kind, extra) {
+      var body = TOKEN ? { action: 'me_' + kind, t: TOKEN } : { action: kind, id: MY_ID };
+      Object.keys(extra || {}).forEach(function (k) { body[k] = extra[k]; });
+      return Z.apiPost(body);
     }
 
-    // タップした瞬間に画面を変える。連打できる。短い間の連打は最終状態だけを1回サーバーに送る。
-    var pend = null;   // { before, target, timer, inflight }
-    var lastBefore = null;   // 直近の連打前の状態(「直前に戻す」用)
+    // 状態: タップした瞬間に画面を変える。連打できる。短い間の連打は最終状態だけを1回送る。
+    var pend = null, lastBefore = null;
     function setLocal(status) {
       if (!me) return;
       if (!pend) { pend = { before: { status: me.status, updated: me.updated }, target: null, timer: null, inflight: false }; lastBefore = pend.before.status; }
@@ -66,10 +113,10 @@
     function flush() {
       if (!pend || pend.inflight || pend.target == null) return;
       var target = pend.target; pend.target = null; pend.inflight = true;
-      Z.apiPost({ action: 'me_set', t: TOKEN, status: target }).then(function (m) {
+      post('set', { status: target }).then(function (m) {
         pend.inflight = false;
         if (pend.target != null) { flush(); return; }
-        pend = null; busy = false; me = m; render(); setErr('');
+        pend = null; busy = false; me.status = m.status; me.updated = m.updated; render(); setErr('');
       }).catch(function (e) {
         var b = pend.before; pend = null; busy = false;
         me.status = b.status; me.updated = b.updated; render();
@@ -81,17 +128,31 @@
       if (!me || placeBusy || p === me.location) return;
       var from = me.location; placeBusy = true;
       me.location = p; render();
-      Z.apiPost({ action: 'me_place', t: TOKEN, location: p }).then(function (m) { placeBusy = false; me.location = m.location; render(); setErr(''); })
+      post('place', { location: p }).then(function (m) { placeBusy = false; me.location = m.location; render(); setErr(''); })
         .catch(function (e) { placeBusy = false; me.location = from; render(); setErr('場所を変えられませんでした: ' + e.message); });
     }
     document.getElementById('undo').onclick = function () {
       if (!me) return;
       if (lastBefore && lastBefore !== me.status) { setLocal(lastBefore); return; }
       if (busy) return; busy = true;
-      Z.apiPost({ action: 'me_undo', t: TOKEN }).then(function (m) { me = m; render(); busy = false; setErr(''); }).catch(setErr);
+      post('undo').then(function (m) { me.status = m.status; me.updated = m.updated; render(); busy = false; setErr(''); }).catch(setErr);
     };
 
-    Z.apiGet({ api: 'state' }).then(function (s) { statuses = s.statuses; render(); }).catch(function () {});
+    // 取り直し: 全員の状態を取り、自分の分を反映(通信中は手元を優先)
+    function load() {
+      Z.apiGet({ api: 'state' }).then(function (s) {
+        state = s; statuses = s.statuses;
+        if (busy || placeBusy) return;
+        var found = null;
+        if (TOKEN) {
+          return Z.apiGet({ api: 'me', t: TOKEN }).then(function (m) { me = m; render(); setErr(''); })
+            .catch(function (e) { me = null; show('mine'); document.getElementById('card').textContent = '表示できません'; setErr(e); });
+        }
+        if (MY_ID) found = s.members.filter(function (m) { return m.id === MY_ID; })[0] || null;
+        if (MY_ID && !found) { MY_ID = ''; try { localStorage.removeItem('zaiseki_me_id'); } catch (e) {} }
+        me = found; render(); setErr('');
+      }).catch(function (e) { setErr('通信エラー: ' + e.message); });
+    }
     load(); setInterval(load, 5000);
   </script>
 </body>

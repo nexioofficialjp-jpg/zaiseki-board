@@ -46,6 +46,15 @@ button { font: inherit; cursor: pointer; }
 .me .places button { flex: 1; background: #555; color: #fff; border: 2px solid transparent; border-radius: 10px; padding: 12px 6px; font-size: 15px; }
 .me .places button.on { background: #fff; color: #222; font-weight: 700; }
 .me .places-label { margin-top: 14px; color: #aaa; font-size: 13px; }
+/* 本人用: 初回の名前選び */
+.me .pick-title { font-size: 20px; font-weight: 700; margin: 6px 0 4px; }
+.me .pick-note { color: #aaa; font-size: 13px; margin-bottom: 10px; }
+.me .pick-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; margin: 6px 0 10px; }
+.me .pick-grid button { background: #fff; color: #222; border: 0; border-radius: 6px; padding: 12px 6px; font-size: 16px; font-weight: 700;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.me .pick-grid button:active { background: #ddd; }
+.me .switch { margin-top: 18px; text-align: center; font-size: 13px; }
+.me .switch a { color: #9cf; }
 .empty { padding: 40px; text-align: center; color: #bbb; }
 .foot { text-align: center; color: #888; font-size: 11px; padding: 6px; }
 
