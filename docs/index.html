@@ -26,16 +26,17 @@
     var busy = {};      // id → true 通信中(その間はポーリング結果でその人を上書きしない)
 
     // 列数 (この端末に記憶)
-    var COL_CHOICES = [4, 5, 6, 8];
-    var cols = Number(localStorage.getItem('zaiseki_cols')) || 5;
-    var narrow = window.matchMedia('(max-width: 700px)');   // スマホ幅は常に2列
-    narrow.addEventListener ? narrow.addEventListener('change', applyCols) : narrow.addListener(applyCols);
+    // 列数: 「自動」は画面幅に合わせて入るだけ並べる(コマ最小幅 170px)。数字は固定列。スマホ幅は常に2列(CSS)。
+    var COL_CHOICES = ['自動', 6, 8, 10, 12];
+    var cols = localStorage.getItem('zaiseki_cols2') || '自動';
     function applyCols() {
-      document.documentElement.style.setProperty('--cols', narrow.matches ? 2 : cols);
+      var fixed = cols !== '自動';
+      document.documentElement.style.setProperty('--cols', fixed ? cols : 1);
+      document.body.classList.toggle('fixed-cols', fixed);
       var box = document.getElementById('cols'); box.innerHTML = '';
       COL_CHOICES.forEach(function (n) {
-        var b = document.createElement('button'); b.textContent = n; b.className = n === cols ? 'on' : '';
-        b.onclick = function () { cols = n; localStorage.setItem('zaiseki_cols', n); applyCols(); };
+        var b = document.createElement('button'); b.textContent = n; b.className = String(n) === String(cols) ? 'on' : '';
+        b.onclick = function () { cols = String(n); localStorage.setItem('zaiseki_cols2', cols); applyCols(); render(); };
         box.appendChild(b);
       });
     }
@@ -57,7 +58,7 @@
         h.innerHTML = '<span class="nm"></span><span class="cnt"></span>';
         h.querySelector('.nm').textContent = loc;
         h.querySelector('.cnt').textContent = list.length ? (state.statuses[0] + ' ' + present + ' / ' + list.length) : '(登録なし)';
-        var g = document.createElement('div'); g.className = 'grid';
+        var g = document.createElement('div'); g.className = 'grid' + (cols !== '自動' ? ' fixed' : '');
         list.forEach(function (m) {
           var t = Z.tile(m);
           t.onclick = function () { tap(m.id); };
