@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>在席ボード</title>
-  <link rel="stylesheet" href="style.css?v=12">
+  <link rel="stylesheet" href="style.css?v=13">
 </head>
 <body>
   <div class="top">
@@ -20,8 +20,8 @@
   <div class="foot">在席ボード</div>
   <div id="toast" class="toast"><span id="toastMsg"></span><button id="extraBtn" style="display:none">行き先</button><button id="undoBtn">戻す</button></div>
 
-  <script src="config.js?v=12"></script>
-  <script src="app.js?v=12"></script>
+  <script src="config.js?v=13"></script>
+  <script src="app.js?v=13"></script>
   <script>
     var state = { statuses: [], locations: [], members: [] };
     var busy = {};      // id → true 通信中(その間はポーリング結果でその人を上書きしない)
@@ -175,8 +175,10 @@
       send();
     }
 
+    var pollFails = 0;   // 一時的な通信失敗は表示しない(3回続いたら出す)
     function poll() {
       Z.apiGet({ api: 'state' }).then(function (s) {
+        pollFails = 0;
         // 通信中の人は手元の表示を優先する
         s.members.forEach(function (n) {
           var m = member(n.id); if (!m) return;
@@ -184,7 +186,7 @@
           if (memoBusy[n.id]) { n.memo = m.memo; }
         });
         state = s; render(); setErr('');
-      }).catch(function (e) { setErr('通信エラー: ' + e.message); });
+      }).catch(function (e) { if (++pollFails >= 3) setErr('通信エラー: ' + e.message); });
     }
 
     function clock() {
