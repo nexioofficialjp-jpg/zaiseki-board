@@ -30,14 +30,18 @@
       var t = Z.tile(me, { hint: 'タップで「' + next(me.status) + '」に' });
       t.onclick = function () {
         if (busy) return; busy = true;
-        Z.apiPost({ action: 'me_cycle', t: TOKEN }).then(function (m) { me = m; render(); busy = false; setErr(''); }).catch(setErr);
+        // 先に画面を変えて、通信は裏で。失敗したら元に戻す。
+        var before = { status: me.status, updated: me.updated };
+        me.status = next(me.status); me.updated = Date.now(); render();
+        Z.apiPost({ action: 'me_cycle', t: TOKEN }).then(function (m) { me = m; render(); busy = false; setErr(''); })
+          .catch(function (e) { me.status = before.status; me.updated = before.updated; render(); setErr('反映できませんでした: ' + e.message); });
       };
       box.appendChild(t);
       document.getElementById('flow').textContent = statuses.join(' → ') + (statuses.length ? ' → ' + statuses[0] : '');
     }
 
     function load() {
-      Z.apiGet({ api: 'me', t: TOKEN }).then(function (m) { me = m; render(); setErr(''); })
+      Z.apiGet({ api: 'me', t: TOKEN }).then(function (m) { if (busy) return; me = m; render(); setErr(''); })
         .catch(function (e) { me = null; render(); setErr(e); });
     }
 

@@ -23,7 +23,7 @@
   <script src="app.js"></script>
   <script>
     var state = { statuses: [], locations: [], members: [] };
-    var busy = {};
+    var busy = {};      // id → true 通信中(その間はポーリング結果でその人を上書きしない)
 
     // 列数 (この端末に記憶)
     var COL_CHOICES = [4, 5, 6, 8];
@@ -50,12 +50,11 @@
       if (others.length) groups.push('その他');
       groups.forEach(function (loc) {
         var list = loc === 'その他' ? others : state.members.filter(function (m) { return m.location === loc; });
-        if (!list.length) return;
         var present = list.filter(function (m) { return m.status === state.statuses[0]; }).length;
         var h = document.createElement('div'); h.className = 'loc';
         h.innerHTML = '<span class="nm"></span><span class="cnt"></span>';
         h.querySelector('.nm').textContent = loc;
-        h.querySelector('.cnt').textContent = state.statuses[0] + ' ' + present + ' / ' + list.length;
+        h.querySelector('.cnt').textContent = list.length ? (state.statuses[0] + ' ' + present + ' / ' + list.length) : '(登録なし)';
         var g = document.createElement('div'); g.className = 'grid';
         list.forEach(function (m) {
           var t = Z.tile(m);
@@ -66,27 +65,53 @@
       });
     }
 
+    function member(id) {
+      for (var i = 0; i < state.members.length; i++) if (state.members[i].id === id) return state.members[i];
+      return null;
+    }
     function apply(res) {
-      state.members.forEach(function (m) {
-        if (m.id === res.id) { m.status = res.status; m.updated = res.updated; }
-      });
+      var m = member(res.id);
+      if (m) { m.status = res.status; m.updated = res.updated; }
       render();
     }
+    function nextStatus(s) { return state.statuses[(state.statuses.indexOf(s) + 1) % state.statuses.length]; }
 
+    // タップした瞬間に画面を変え、通信は裏で行う。失敗したら元に戻す。
     function tap(id) {
       if (busy[id]) return;
+      var m = member(id); if (!m) return;
+      var before = { status: m.status, updated: m.updated };
+      var after = nextStatus(m.status);
       busy[id] = true;
+      m.status = after; m.updated = Date.now(); render();
+      Z.toast(m.name + ': ' + before.status + ' → ' + after, function () { undo(id, before); });
       Z.apiPost({ action: 'cycle', id: id }).then(function (res) {
         busy[id] = false; apply(res); setErr('');
-        Z.toast(res.name + ': ' + res.prev + ' → ' + res.status, function () {
-          Z.apiPost({ action: 'undo', id: id }).then(apply).catch(function (e) { setErr(e.message); });
-        });
-      }).catch(function (e) { busy[id] = false; setErr(e.message); });
+      }).catch(function (e) {
+        busy[id] = false; m.status = before.status; m.updated = before.updated; render();
+        setErr('反映できませんでした: ' + e.message);
+      });
+    }
+
+    function undo(id, before) {
+      var m = member(id); if (!m) return;
+      var cur = { status: m.status, updated: m.updated };
+      busy[id] = true;
+      m.status = before.status; m.updated = Date.now(); render();
+      Z.apiPost({ action: 'undo', id: id }).then(function (res) {
+        busy[id] = false; apply(res); setErr('');
+      }).catch(function (e) {
+        busy[id] = false; m.status = cur.status; m.updated = cur.updated; render();
+        setErr('戻せませんでした: ' + e.message);
+      });
     }
 
     function poll() {
-      Z.apiGet({ api: 'state' }).then(function (s) { state = s; render(); setErr(''); })
-        .catch(function (e) { setErr('通信エラー: ' + e.message); });
+      Z.apiGet({ api: 'state' }).then(function (s) {
+        // 通信中の人は手元の表示を優先する
+        s.members.forEach(function (n) { if (busy[n.id]) { var m = member(n.id); if (m) { n.status = m.status; n.updated = m.updated; } } });
+        state = s; render(); setErr('');
+      }).catch(function (e) { setErr('通信エラー: ' + e.message); });
     }
 
     function clock() {
