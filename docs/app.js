@@ -31,13 +31,21 @@
     var b = document.createElement('button');
     b.className = 'tile';
     b.style.setProperty('--c', 'var(--c-' + m.status + ')');
+    var multi = m.places && m.places.length > 1;
+    if (multi) b.classList.add('multi');
     b.innerHTML = '<span class="name"></span><span class="st"><span class="ic"></span><span class="txt"></span></span>' +
-      (opts.hint ? '<span class="hint"></span>' : '') + '<span class="time"></span>';
+      (opts.hint ? '<span class="hint"></span>' : '') + '<span class="time"></span>' +
+      (multi && opts.placeChip !== false ? '<span class="place" title="タップで場所を切り替え"></span>' : '');
     b.querySelector('.name').textContent = m.name;
     b.querySelector('.ic').textContent = ICONS[m.status] || '';
     b.querySelector('.txt').textContent = m.status;
     b.querySelector('.time').textContent = fmtTime(m.updated);
     if (opts.hint) b.querySelector('.hint').textContent = opts.hint;
+    var chip = b.querySelector('.place');
+    if (chip) {
+      chip.textContent = '⇄ ' + m.location;
+      chip.onclick = function (ev) { ev.stopPropagation(); if (opts.onPlace) opts.onPlace(m); };
+    }
     return b;
   }
 

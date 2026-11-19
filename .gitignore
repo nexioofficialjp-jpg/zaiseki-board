@@ -1,4 +1,6 @@
 secret.js
+seed_*.ps1
+*.名簿*.txt
 .clasp.json
 .clasprc.json
 node_modules/

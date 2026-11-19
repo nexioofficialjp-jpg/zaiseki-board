@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>在席ボード</title>
-  <link rel="stylesheet" href="style.css?v=4">
+  <link rel="stylesheet" href="style.css?v=5">
 </head>
 <body>
   <div class="top">
@@ -19,8 +19,8 @@
   <div class="foot">在席ボード</div>
   <div id="toast" class="toast"><span id="toastMsg"></span><button id="undoBtn">戻す</button></div>
 
-  <script src="config.js?v=4"></script>
-  <script src="app.js?v=4"></script>
+  <script src="config.js?v=5"></script>
+  <script src="app.js?v=5"></script>
   <script>
     var state = { statuses: [], locations: [], members: [] };
     var busy = {};      // id → true 通信中(その間はポーリング結果でその人を上書きしない)
@@ -60,7 +60,7 @@
         h.querySelector('.cnt').textContent = list.length ? (state.statuses[0] + ' ' + present + ' / ' + list.length) : '(登録なし)';
         var g = document.createElement('div'); g.className = 'grid' + (cols !== '自動' ? ' fixed' : '');
         list.forEach(function (m) {
-          var t = Z.tile(m);
+          var t = Z.tile(m, { onPlace: togglePlace });
           t.onclick = function () { tap(m.id); };
           g.appendChild(t);
         });
@@ -113,6 +113,25 @@
         setErr('反映できませんでした: ' + e.message);
       });
     }
+    // 兼任者の場所バッジをタップ → 次の拠点へ。先に画面を動かし、通信は裏で。失敗したら戻す。
+    var placeBusy = {};
+    function togglePlace(m) {
+      if (!m.places || m.places.length < 2 || placeBusy[m.id]) return;
+      var i = m.places.indexOf(m.location);
+      var to = m.places[(i + 1) % m.places.length];
+      var from = m.location;
+      placeBusy[m.id] = true; busy[m.id] = true;
+      m.location = to; render();
+      Z.apiPost({ action: 'place', id: m.id, location: to }).then(function (res) {
+        placeBusy[m.id] = false; if (!pending[m.id]) busy[m.id] = false;
+        var cur = member(m.id); if (cur) cur.location = res.location; render(); setErr('');
+      }).catch(function (e) {
+        placeBusy[m.id] = false; if (!pending[m.id]) busy[m.id] = false;
+        var cur = member(m.id); if (cur) cur.location = from; render();
+        setErr('場所を変えられませんでした: ' + e.message);
+      });
+    }
+
     function tap(id) {
       var m = member(id); if (!m) return;
       var p = setLocal(id, nextStatus(m.status));
@@ -123,7 +142,7 @@
     function poll() {
       Z.apiGet({ api: 'state' }).then(function (s) {
         // 通信中の人は手元の表示を優先する
-        s.members.forEach(function (n) { if (busy[n.id]) { var m = member(n.id); if (m) { n.status = m.status; n.updated = m.updated; } } });
+        s.members.forEach(function (n) { if (busy[n.id]) { var m = member(n.id); if (m) { n.status = m.status; n.updated = m.updated; n.location = m.location; } } });
         state = s; render(); setErr('');
       }).catch(function (e) { setErr('通信エラー: ' + e.message); });
     }

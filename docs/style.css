@@ -35,6 +35,17 @@ button { font: inherit; cursor: pointer; }
 .tile .st .ic { width: 26px; height: 26px; background: #fff; border-radius: 2px; display: flex; align-items: center; justify-content: center; font-size: 17px; }
 .tile .time { font-size: 12px; line-height: 1; justify-self: end; opacity: .95; }
 .tile .hint { display: none; }
+/* 兼任者: 名前の下に今いる場所のバッジ(タップで切替) */
+.tile.multi .name { align-self: start; margin-top: 4px; height: 30px; line-height: 30px; }
+.tile .place { position: absolute; left: 6px; bottom: 3px; font-size: 11px; line-height: 1; background: rgba(0,0,0,.4); color: #fff;
+  padding: 3px 8px; border-radius: 9px; cursor: pointer; white-space: nowrap; }
+.tile .place:hover { background: rgba(0,0,0,.6); }
+.me .tile .place { display: none; }
+.me .tile.multi .name { align-self: auto; margin-top: 0; height: 44px; line-height: 44px; }
+.me .places { display: flex; gap: 8px; margin-top: 10px; }
+.me .places button { flex: 1; background: #555; color: #fff; border: 2px solid transparent; border-radius: 10px; padding: 12px 6px; font-size: 15px; }
+.me .places button.on { background: #fff; color: #222; font-weight: 700; }
+.me .places-label { margin-top: 14px; color: #aaa; font-size: 13px; }
 .empty { padding: 40px; text-align: center; color: #bbb; }
 .foot { text-align: center; color: #888; font-size: 11px; padding: 6px; }
 

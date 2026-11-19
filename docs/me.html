@@ -5,18 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <title>在席ボード</title>
-  <link rel="stylesheet" href="style.css?v=4">
+  <link rel="stylesheet" href="style.css?v=5">
 </head>
 <body>
   <div class="me">
     <div id="card"></div>
+    <div id="placesLabel" class="places-label" style="display:none">いま居る場所(タップで切替)</div>
+    <div id="places" class="places"></div>
     <button id="undo" class="undo">直前に戻す</button>
     <div id="flow" class="flow"></div>
     <div id="err" class="err"></div>
   </div>
 
-  <script src="config.js?v=4"></script>
-  <script src="app.js?v=4"></script>
+  <script src="config.js?v=5"></script>
+  <script src="app.js?v=5"></script>
   <script>
     var TOKEN = (new URLSearchParams(location.search).get('t') || '').replace(/[^A-Za-z0-9]/g, '');
     var me = null, busy = false, statuses = [];
@@ -27,14 +29,25 @@
     function render() {
       var box = document.getElementById('card'); box.innerHTML = '';
       if (!me) { box.textContent = '表示できません'; return; }
-      var t = Z.tile(me, { hint: 'タップで「' + next(me.status) + '」に' });
+      var t = Z.tile(me, { hint: 'タップで「' + next(me.status) + '」に', placeChip: false });
       t.onclick = function () { setLocal(next(me.status)); };
       box.appendChild(t);
+      // 兼任者: いま居る場所の切替ボタン
+      var pb = document.getElementById('places'); pb.innerHTML = '';
+      var multi = me.places && me.places.length > 1;
+      document.getElementById('placesLabel').style.display = multi ? '' : 'none';
+      if (multi) {
+        me.places.forEach(function (p) {
+          var b = document.createElement('button'); b.textContent = p; b.className = p === me.location ? 'on' : '';
+          b.onclick = function () { setPlace(p); };
+          pb.appendChild(b);
+        });
+      }
       document.getElementById('flow').textContent = statuses.join(' → ') + (statuses.length ? ' → ' + statuses[0] : '');
     }
 
     function load() {
-      Z.apiGet({ api: 'me', t: TOKEN }).then(function (m) { if (busy) return; me = m; render(); setErr(''); })
+      Z.apiGet({ api: 'me', t: TOKEN }).then(function (m) { if (busy || placeBusy) return; me = m; render(); setErr(''); })
         .catch(function (e) { me = null; render(); setErr(e); });
     }
 
@@ -62,6 +75,14 @@
         me.status = b.status; me.updated = b.updated; render();
         setErr('反映できませんでした: ' + e.message);
       });
+    }
+    var placeBusy = false;
+    function setPlace(p) {
+      if (!me || placeBusy || p === me.location) return;
+      var from = me.location; placeBusy = true;
+      me.location = p; render();
+      Z.apiPost({ action: 'me_place', t: TOKEN, location: p }).then(function (m) { placeBusy = false; me.location = m.location; render(); setErr(''); })
+        .catch(function (e) { placeBusy = false; me.location = from; render(); setErr('場所を変えられませんでした: ' + e.message); });
     }
     document.getElementById('undo').onclick = function () {
       if (!me) return;

@@ -10,14 +10,15 @@
  * POST JSON {key, action: 'list'|'add'|'rename'|'location'|'delete'|'move'|'reissue', ...}  名簿編集(secret.js の鍵)
  */
 const STATUSES = ['在席', '外出', '退社', '休み'];
-const LOCATIONS = ['渡辺ビルA', '渡辺ビルB', '波多野ビル3F', 'Hope crew'];
+const LOCATIONS = ['渡辺ビルA', '渡辺ビルB', '波多野ビル3F', 'Hope crew', '在宅'];
 const SITE_URL = 'https://nexioofficialjp-jpg.github.io/zaiseki-board/';
 const SHEET_ROSTER = '名簿';
 const SHEET_LOG = 'ログ';
 const CACHE_KEY = 'state_v2';
 const CACHE_SEC = 60;
-const COL = { id: 1, name: 2, status: 3, updated: 4, prev: 5, token: 6, order: 7, location: 8 };
-const ROSTER_HEADER = ['ID', '名前', '状態', '更新時刻', '前状態', 'トークン', '順', '拠点'];
+// 拠点 = 今いる場所。兼任拠点 = 行き来する拠点の一覧(カンマ区切り。兼任でない人は空)
+const COL = { id: 1, name: 2, status: 3, updated: 4, prev: 5, token: 6, order: 7, location: 8, places: 9 };
+const ROSTER_HEADER = ['ID', '名前', '状態', '更新時刻', '前状態', 'トークン', '順', '拠点', '兼任拠点'];
 const LOG_HEADER = ['日時', 'ID', '名前', '前', '後', '操作元'];
 
 // ---------- 入口 ----------
@@ -52,10 +53,13 @@ function doPost(e) {
     else if (a === 'me_cycle') out = cycleStatus(findBy_('token', String(q.t || '')).id, 'me');
     else if (a === 'me_undo') out = undoStatus(findBy_('token', String(q.t || '')).id, 'me');
     else if (a === 'me_set') out = setStatus(findBy_('token', String(q.t || '')).id, q.status, 'me');
+    else if (a === 'place') out = setPlace(q.id, q.location, 'board');
+    else if (a === 'me_place') out = setPlace(findBy_('token', String(q.t || '')).id, q.location, 'me');
     else {
       checkKey_(q.key);
       if (a === 'list') out = adminList_();
-      else if (a === 'add') out = { id: adminAdd_(q.name, q.location) };
+      else if (a === 'add') out = { id: adminAdd_(q.name, q.location, q.places) };
+      else if (a === 'places') out = adminSetPlaces_(q.id, q.places);
       else if (a === 'rename') out = adminRename_(q.id, q.name);
       else if (a === 'location') out = adminSetLocation_(q.id, q.location);
       else if (a === 'delete') out = adminDelete_(q.id);
@@ -99,7 +103,8 @@ function rosterRows_() {
       prev: String(v[COL.prev - 1] || ''),
       token: String(v[COL.token - 1] || ''),
       order: Number(v[COL.order - 1]) || 0,
-      location: String(v[COL.location - 1] || '')
+      location: String(v[COL.location - 1] || ''),
+      places: String(v[COL.places - 1] || '').split(/[,、]/).map(s => s.trim()).filter(Boolean)
     });
   });
   rows.sort((a, b) => a.order - b.order);
@@ -107,7 +112,7 @@ function rosterRows_() {
 }
 
 function publicMember_(r) {
-  return { id: r.id, name: r.name, status: r.status, updated: r.updated, order: r.order, location: r.location };
+  return { id: r.id, name: r.name, status: r.status, updated: r.updated, order: r.order, location: r.location, places: r.places };
 }
 
 function invalidate_() { CacheService.getScriptCache().remove(CACHE_KEY); }
@@ -121,7 +126,23 @@ function writeStatus_(sh, r, newStatus, source) {
   sh.getRange(r.row, COL.status, 1, 3).setValues([[newStatus, now, r.status]]);
   log_(r, r.status, newStatus, source);
   invalidate_();
-  return { id: r.id, name: r.name, status: newStatus, prev: r.status, updated: now.getTime(), location: r.location };
+  return { id: r.id, name: r.name, status: newStatus, prev: r.status, updated: now.getTime(), location: r.location, places: r.places };
+}
+
+/** 兼任者の今いる場所を切り替える(兼任拠点に含まれる場所のみ)。状態・更新時刻は変えない */
+function setPlace(id, location, source) {
+  location = String(location || '').trim();
+  return withLock_(() => {
+    const r = findBy_('id', String(id));
+    if (!r.places.length) throw new Error('兼任ではありません');
+    if (r.places.indexOf(location) < 0) throw new Error('行き来する拠点にありません: ' + location);
+    if (r.location !== location) {
+      sheet_(SHEET_ROSTER, ROSTER_HEADER).getRange(r.row, COL.location).setValue(location);
+      log_(r, r.location, location, (source || 'board') + ':場所');
+      invalidate_();
+    }
+    return { id: r.id, name: r.name, status: r.status, prev: r.prev, updated: r.updated, location: location, places: r.places };
+  });
 }
 
 function withLock_(fn) {
@@ -189,7 +210,7 @@ function adminList_() {
     site: SITE_URL,
     locations: LOCATIONS,
     members: rosterRows_().map(r => ({
-      id: r.id, name: r.name, location: r.location, status: r.status, updated: r.updated, order: r.order, token: r.token
+      id: r.id, name: r.name, location: r.location, places: r.places, status: r.status, updated: r.updated, order: r.order, token: r.token
     }))
   };
 }
@@ -207,19 +228,40 @@ function location_(loc) {
   return loc;
 }
 
-function adminAdd_(name, location) {
+function places_(places, loc) {
+  let list = Array.isArray(places) ? places : String(places || '').split(/[,、]/);
+  list = list.map(s => String(s).trim()).filter(Boolean);
+  list.forEach(location_);
+  if (list.length && loc && list.indexOf(loc) < 0) list.unshift(loc);
+  return list.join(',');
+}
+
+function adminAdd_(name, location, places) {
   name = String(name || '').trim();
   if (!name) throw new Error('名前が空です');
   const loc = location_(location);
+  const pl = places_(places, loc);
   return withLock_(() => {
     const sh = sheet_(SHEET_ROSTER, ROSTER_HEADER);
     const rows = rosterRows_();
     const order = rows.length ? Math.max.apply(null, rows.map(r => r.order)) + 1 : 1;
     const id = rand_(6);
-    sh.appendRow([id, name, STATUSES[0], new Date(), '', rand_(24), order, loc]);
-    log_({ id: id, name: name }, '', STATUSES[0], 'admin:追加(' + loc + ')');
+    sh.appendRow([id, name, STATUSES[0], new Date(), '', rand_(24), order, loc, pl]);
+    log_({ id: id, name: name }, '', STATUSES[0], 'admin:追加(' + loc + (pl ? ' 兼任:' + pl : '') + ')');
     invalidate_();
     return id;
+  });
+}
+
+/** 兼任拠点を設定する(空にすると兼任解除) */
+function adminSetPlaces_(id, places) {
+  return withLock_(() => {
+    const r = findBy_('id', String(id));
+    const pl = places_(places, r.location);
+    sheet_(SHEET_ROSTER, ROSTER_HEADER).getRange(r.row, COL.places).setValue(pl);
+    log_(r, r.places.join(','), pl, 'admin:兼任拠点');
+    invalidate_();
+    return pl;
   });
 }
 
