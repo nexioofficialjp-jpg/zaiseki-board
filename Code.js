@@ -277,3 +277,6 @@ function setup() {
   if (s1 && ss_().getSheets().length > 1 && s1.getLastRow() === 0) ss_().deleteSheet(s1);
   return 'ok';
 }
+
+// 2026-11-19 clasp 送信対象を限定
+
