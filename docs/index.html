@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>在席ボード</title>
-  <link rel="stylesheet" href="style.css?v=7">
+  <link rel="stylesheet" href="style.css?v=8">
 </head>
 <body>
   <div class="top">
@@ -17,10 +17,10 @@
   <div id="root"></div>
   <div id="empty" class="empty" style="display:none">名簿が空です</div>
   <div class="foot">在席ボード</div>
-  <div id="toast" class="toast"><span id="toastMsg"></span><button id="undoBtn">戻す</button></div>
+  <div id="toast" class="toast"><span id="toastMsg"></span><button id="extraBtn" style="display:none">行き先</button><button id="undoBtn">戻す</button></div>
 
-  <script src="config.js?v=7"></script>
-  <script src="app.js?v=7"></script>
+  <script src="config.js?v=8"></script>
+  <script src="app.js?v=8"></script>
   <script>
     var state = { statuses: [], locations: [], members: [] };
     var busy = {};      // id → true 通信中(その間はポーリング結果でその人を上書きしない)
@@ -60,12 +60,13 @@
         h.querySelector('.cnt').textContent = list.length ? (state.statuses[0] + ' ' + present + ' / ' + list.length) : '(登録なし)';
         var g = document.createElement('div'); g.className = 'grid' + (cols !== '自動' ? ' fixed' : '');
         list.forEach(function (m) {
-          var t = Z.tile(m, { onPlace: togglePlace });
+          var t = Z.tile(m, { onPlace: togglePlace, onMemo: editMemo });
           t.onclick = function () { tap(m.id); };
           g.appendChild(t);
         });
         root.appendChild(h); root.appendChild(g);
       });
+      Z.fitNames(root);
     }
 
     function member(id) {
@@ -77,7 +78,11 @@
       if (m) { m.status = res.status; m.updated = res.updated; }
       render();
     }
-    function nextStatus(s) { return state.statuses[(state.statuses.indexOf(s) + 1) % state.statuses.length]; }
+    // その人が取り得る状態。在宅固定の人(拠点=在宅)は「在宅勤務」を飛ばす
+    function statusesFor(m) {
+      return m.location === '在宅' ? state.statuses.filter(function (s) { return s !== '在宅勤務'; }) : state.statuses;
+    }
+    function nextStatus(m) { var list = statusesFor(m); return list[(list.indexOf(m.status) + 1) % list.length]; }
 
     // タップした瞬間に画面を変える。連打できる。短い間の連打は最終状態だけを1回サーバーに送る。
     // 失敗したら連打前の状態に戻す。
@@ -134,15 +139,44 @@
 
     function tap(id) {
       var m = member(id); if (!m) return;
-      var p = setLocal(id, nextStatus(m.status));
+      var p = setLocal(id, nextStatus(m));
       if (!p) return;
-      Z.toast(m.name + ': ' + p.before.status + ' → ' + m.status, function () { setLocal(id, p.before.status); });
+      var extra = m.status === Z.MEMO_STATUS ? { label: '行き先', fn: function () { editMemo(m); } } : null;
+      Z.toast(m.name + ': ' + p.before.status + ' → ' + m.status, function () { setLocal(id, p.before.status); }, extra);
+    }
+
+    // 行き先メモ(外出中のみ)。先に画面へ出し、通信は裏で。失敗したら戻す。
+    var memoBusy = {};
+    function editMemo(m) {
+      if (m.status !== Z.MEMO_STATUS) return;
+      var v = window.prompt(m.name + ' の行き先(空にすると消す)', m.memo || '');
+      if (v === null) return;
+      v = v.trim().slice(0, 40);
+      if (v === (m.memo || '')) return;
+      var from = m.memo || '';
+      // 状態の送信が終わるのを待ってから送る(外出がまだ保存されていない可能性があるため)
+      function send() {
+        if (pending[m.id]) { setTimeout(send, 300); return; }
+        memoBusy[m.id] = true;
+        Z.apiPost({ action: 'memo', id: m.id, memo: v }).then(function (res) {
+          memoBusy[m.id] = false; var cur = member(m.id); if (cur) cur.memo = res.memo; render(); setErr('');
+        }).catch(function (e) {
+          memoBusy[m.id] = false; var cur = member(m.id); if (cur) cur.memo = from; render();
+          setErr('行き先を保存できませんでした: ' + e.message);
+        });
+      }
+      m.memo = v; render();
+      send();
     }
 
     function poll() {
       Z.apiGet({ api: 'state' }).then(function (s) {
         // 通信中の人は手元の表示を優先する
-        s.members.forEach(function (n) { if (busy[n.id]) { var m = member(n.id); if (m) { n.status = m.status; n.updated = m.updated; n.location = m.location; } } });
+        s.members.forEach(function (n) {
+          var m = member(n.id); if (!m) return;
+          if (busy[n.id]) { n.status = m.status; n.updated = m.updated; n.location = m.location; n.memo = m.memo; }
+          if (memoBusy[n.id]) { n.memo = m.memo; }
+        });
         state = s; render(); setErr('');
       }).catch(function (e) { setErr('通信エラー: ' + e.message); });
     }

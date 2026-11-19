@@ -9,7 +9,9 @@
  * POST JSON {action: 'me_cycle'|'me_undo', t}       本人用から
  * POST JSON {key, action: 'list'|'add'|'rename'|'location'|'delete'|'move'|'reissue', ...}  名簿編集(secret.js の鍵)
  */
-const STATUSES = ['在席', '外出', '退社', '休み'];
+const STATUSES = ['在席', '外出', '退社', '休み', '在宅勤務', '出張'];
+const MEMO_STATUS = '外出';      // 行き先メモを持てる状態
+const MEMO_MAX = 40;
 const LOCATIONS = ['渡辺ビルA', '渡辺ビルB', '波多野ビル3F', 'Hope crew', '在宅'];
 const SITE_URL = 'https://nexioofficialjp-jpg.github.io/zaiseki-board/';
 const SHEET_ROSTER = '名簿';
@@ -17,8 +19,8 @@ const SHEET_LOG = 'ログ';
 const CACHE_KEY = 'state_v2';
 const CACHE_SEC = 60;
 // 拠点 = 今いる場所。兼任拠点 = 行き来する拠点の一覧(カンマ区切り。兼任でない人は空)
-const COL = { id: 1, name: 2, status: 3, updated: 4, prev: 5, token: 6, order: 7, location: 8, places: 9 };
-const ROSTER_HEADER = ['ID', '名前', '状態', '更新時刻', '前状態', 'トークン', '順', '拠点', '兼任拠点'];
+const COL = { id: 1, name: 2, status: 3, updated: 4, prev: 5, token: 6, order: 7, location: 8, places: 9, memo: 10 };
+const ROSTER_HEADER = ['ID', '名前', '状態', '更新時刻', '前状態', 'トークン', '順', '拠点', '兼任拠点', 'メモ'];
 const LOG_HEADER = ['日時', 'ID', '名前', '前', '後', '操作元'];
 
 // ---------- 入口 ----------
@@ -54,6 +56,7 @@ function doPost(e) {
     else if (a === 'me_undo') out = undoStatus(findBy_('token', String(q.t || '')).id, 'me');
     else if (a === 'me_set') out = setStatus(findBy_('token', String(q.t || '')).id, q.status, 'me');
     else if (a === 'place') out = setPlace(q.id, q.location, 'board');
+    else if (a === 'memo') out = setMemo(q.id, q.memo, 'board');
     else if (a === 'me_place') out = setPlace(findBy_('token', String(q.t || '')).id, q.location, 'me');
     else {
       checkKey_(q.key);
@@ -104,7 +107,8 @@ function rosterRows_() {
       token: String(v[COL.token - 1] || ''),
       order: Number(v[COL.order - 1]) || 0,
       location: String(v[COL.location - 1] || ''),
-      places: String(v[COL.places - 1] || '').split(/[,、]/).map(s => s.trim()).filter(Boolean)
+      places: String(v[COL.places - 1] || '').split(/[,、]/).map(s => s.trim()).filter(Boolean),
+      memo: String(v[COL.memo - 1] || '')
     });
   });
   rows.sort((a, b) => a.order - b.order);
@@ -112,7 +116,7 @@ function rosterRows_() {
 }
 
 function publicMember_(r) {
-  return { id: r.id, name: r.name, status: r.status, updated: r.updated, order: r.order, location: r.location, places: r.places };
+  return { id: r.id, name: r.name, status: r.status, updated: r.updated, order: r.order, location: r.location, places: r.places, memo: r.memo };
 }
 
 function invalidate_() { CacheService.getScriptCache().remove(CACHE_KEY); }
@@ -124,9 +128,29 @@ function log_(r, before, after, source) {
 function writeStatus_(sh, r, newStatus, source) {
   const now = new Date();
   sh.getRange(r.row, COL.status, 1, 3).setValues([[newStatus, now, r.status]]);
+  let memo = r.memo;
+  if (newStatus !== MEMO_STATUS && memo) {   // 外出から他の状態に変わったら行き先は消す
+    sh.getRange(r.row, COL.memo).setValue('');
+    memo = '';
+  }
   log_(r, r.status, newStatus, source);
   invalidate_();
-  return { id: r.id, name: r.name, status: newStatus, prev: r.status, updated: now.getTime(), location: r.location, places: r.places };
+  return { id: r.id, name: r.name, status: newStatus, prev: r.status, updated: now.getTime(), location: r.location, places: r.places, memo: memo };
+}
+
+/** 行き先メモ(外出中のみ)。空文字で消す */
+function setMemo(id, memo, source) {
+  memo = String(memo || '').replace(/[\r\n]+/g, ' ').trim().slice(0, MEMO_MAX);
+  return withLock_(() => {
+    const r = findBy_('id', String(id));
+    if (r.status !== MEMO_STATUS) throw new Error('行き先は' + MEMO_STATUS + '中だけ書けます');
+    if (r.memo !== memo) {
+      sheet_(SHEET_ROSTER, ROSTER_HEADER).getRange(r.row, COL.memo).setValue(memo);
+      log_(r, r.memo, memo, (source || 'board') + ':行き先');
+      invalidate_();
+    }
+    return { id: r.id, name: r.name, status: r.status, prev: r.prev, updated: r.updated, location: r.location, places: r.places, memo: memo };
+  });
 }
 
 /** 兼任者の今いる場所を切り替える(兼任拠点に含まれる場所のみ)。状態・更新時刻は変えない */
@@ -170,7 +194,9 @@ function getState() {
 function cycleStatus(id, source) {
   return withLock_(() => {
     const r = findBy_('id', String(id));
-    const next = STATUSES[(STATUSES.indexOf(r.status) + 1) % STATUSES.length];
+    // 在宅固定の人は「在宅勤務」を飛ばす(画面側と同じ規則)
+    const list = r.location === '在宅' ? STATUSES.filter(s => s !== '在宅勤務') : STATUSES;
+    const next = list[(list.indexOf(r.status) + 1) % list.length];
     return writeStatus_(sheet_(SHEET_ROSTER, ROSTER_HEADER), r, next, source || 'board');
   });
 }

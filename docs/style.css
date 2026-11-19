@@ -1,7 +1,7 @@
 /* 在席ボード (ZAiSEKI 風・大人数向けに薄型のコマ) */
 :root {
   --bg: #3b3b3b; --fg: #fff; --bar: #2a2a2a;
-  --c-在席: #94c03a; --c-外出: #5ec8d8; --c-退社: #b3a386; --c-休み: #a68ad6;
+  --c-在席: #94c03a; --c-外出: #5ec8d8; --c-退社: #b3a386; --c-休み: #a68ad6; --c-在宅勤務: #e09a4a; --c-出張: #d97aa6;
   --tile-min: 210px;   /* 自動列数のときのコマの最小幅 */
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -26,11 +26,16 @@ button { font: inherit; cursor: pointer; }
 /* コマ: 横長・薄型。 [名前(白)] [アイコン+状態 / 時刻] */
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(var(--tile-min), 1fr)); gap: 3px; padding: 3px 4px; }
 .grid.fixed { grid-template-columns: repeat(var(--cols), 1fr); }
-.tile { position: relative; display: grid; grid-template-columns: 1fr auto; grid-template-rows: auto auto; column-gap: 8px; align-items: center;
-  height: 58px; padding: 0 8px 0 6px; background: var(--c); border: 0; border-radius: 3px; color: #fff; text-align: left; user-select: none; overflow: hidden; }
+.tile { position: relative; display: grid; grid-template-columns: 1fr auto; grid-auto-rows: auto; column-gap: 8px; row-gap: 2px; align-items: center; align-content: center;
+  min-height: 58px; padding: 6px 8px 6px 6px; background: var(--c); border: 0; border-radius: 3px; color: #fff; text-align: left; user-select: none; overflow: hidden; }
 .tile:active { filter: brightness(.92); }
-.tile .name { grid-row: 1 / 3; min-width: 0; height: 40px; line-height: 40px; background: #fff; color: #222; border-radius: 2px; text-align: center;
-  font-weight: 700; font-size: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 5px; }
+.tile .name { grid-column: 1; grid-row: 1 / span 3; min-width: 0; height: 40px; line-height: 40px; background: #fff; color: #222; border-radius: 2px; text-align: center;
+  font-weight: 700; font-size: 18px; white-space: nowrap; overflow: hidden; padding: 0 5px; }
+.tile .st, .tile .memo, .tile .time { grid-column: 2; }
+/* 外出の行き先メモ(タップで編集) */
+.tile .memo { justify-self: end; max-width: 150px; font-size: 12px; line-height: 1.2; background: rgba(255,255,255,.92); color: #222; border-radius: 3px; padding: 2px 6px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+.tile .memo.empty { background: rgba(0,0,0,.25); color: #fff; opacity: .9; }
 .tile .st { display: flex; align-items: center; gap: 6px; font-size: 16px; font-weight: 700; line-height: 1; justify-self: end; }
 .tile .st .ic { width: 26px; height: 26px; background: #fff; border-radius: 2px; display: flex; align-items: center; justify-content: center; font-size: 17px; }
 .tile .time { font-size: 12px; line-height: 1; justify-self: end; opacity: .95; }
@@ -53,7 +58,8 @@ button { font: inherit; cursor: pointer; }
   .top .time { font-size: 24px; }
   .top .cols { display: none; }
   .grid, .grid.fixed { grid-template-columns: repeat(2, 1fr); }
-  .tile { height: 54px; }
+  .tile { min-height: 54px; }
+  .tile .memo { max-width: 110px; }
   .tile .name { font-size: 16px; }
   .tile .st { font-size: 15px; }
 }
